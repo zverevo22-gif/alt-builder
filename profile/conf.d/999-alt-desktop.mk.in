@@ -1,0 +1,26 @@
+# ============================================================================
+#  Шаблон конфигурации собственного субпрофиля distro/alt-<DE>, где DE —
+#  выбранное графическое окружение (config/build.conf, DESKTOP=gnome|cinnamon|plasma).
+#  scripts/gen-profile.sh переносит его в conf.d/999-alt-desktop.mk рабочей
+#  копии метапрофиля, заменяя токены @ИМЯ@ значениями из config/*.conf.
+#  Не редактировать вручную: правки делаются в config/*.conf.
+# ============================================================================
+
+# Собственный субпрофиль на базе штатного @DESKTOP_PARENT@ (полный состав
+# регулярного образа выбранного окружения), поверх которого добавляются
+# пользовательские пакеты, списки, брендинг и чёрный список.
+distro/alt-@DESKTOP@: distro/@DESKTOP_PARENT@ use/blacklist-pkgs use/custom-brand
+	@$(call add,THE_PACKAGES,@THE_PACKAGES_EXTRA@)
+	@$(call add,THE_LISTS,@THE_LISTS_EXTRA@)
+	@$(call add,BASE_PACKAGES,@BASE_PACKAGES_EXTRA@)
+	@$(call add,MAIN_PACKAGES,@MAIN_PACKAGES_EXTRA@)
+	@$(call add,LIVE_PACKAGES,@LIVE_PACKAGES_EXTRA@)
+	@$(call add,LIVE_LISTS,@LIVE_LISTS_EXTRA@)
+	@$(call add,INSTALL2_PACKAGES,@INSTALL2_PACKAGES_EXTRA@)
+	@$(call add,BLACKLIST_PKGS,@BLACKLIST_PKGS@)
+	@$(call add,THE_BRANDING,@THE_BRANDING@)
+	@$(call xport,THE_BRANDING)
+	@$(call xport,BLACKLIST_PKGS)
+	@RELNAME_SET@
+	@RELNAME_XPORT@
+	@mp-commit "$(BUILDDIR)" "пользовательская конфигурация alt-@DESKTOP@ применена"

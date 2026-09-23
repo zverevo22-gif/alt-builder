@@ -1,0 +1,213 @@
+# ============================================================================
+#  branding.spec.in — шаблон собственника пакетов брендинга (BRANDING_MODE=repo)
+#
+#  Из этого шаблона утилита tools/mk-branding.sh собирает собственный набор
+#  пакетов `branding-<ИМЯ>-{alterator,bootsplash,bootloader,graphics,indexhtml,
+#  notes,release,slideshow}`, которые обязаны существовать в репозитории при
+#  сборке образа (метапрофиль закрепляет их как PINNED_PACKAGES:Essential).
+#
+#  Подстановки выполняет mk-branding.sh:
+#      %%THEME%%     техническое имя бренда (напр. mydistro)
+#      %%NAME%%      читаемое имя (напр. "My Distro")
+#      %%CODENAME%%  кодовое имя (напр. veles)
+#      %%VERSION%%   версия пакета
+#      %%RELEASE%%   релиз пакета
+#
+#  Макрос %%branding_add_conflicts%% предоставляет пакет rpm-macros-branding.
+#
+#  Структура каталога источников (копируется в branding/ внутри tarball):
+#      alterator/       правки alterator (опционально)
+#      bootloader/      тема grub2: архитектура design (опционально)
+#      bootsplash/plymouth/   тема plymouth (опционально)
+#      bootsplash/bootsplash/ тема классического bootsplash (опционально)
+#      graphics/        изображения, обои, design
+#      indexhtml/       веб-страница приветствия (опционально)
+#      notes/           тексты лицензии и заметок о выпуске
+#      release/os-release    файл os-release (опционально)
+#      slideshow/       слайды инсталлятора (опционально)
+#
+#  См. официальный spec как справочник по полноценному наполнению:
+#  https://git.altlinux.org/gears/b/branding-alt-starterkit.git
+# ============================================================================
+
+Name: branding-%%THEME%%
+%define theme %%THEME%%
+%define Theme %%NAME%%
+%define brand alt
+%define Brand ALT
+%define codename %%CODENAME%%
+%define flavour %brand-%theme
+
+Version: %%VERSION%%
+Release: %%RELEASE%%
+
+Url: https://altlinux.org/
+
+BuildRequires(pre): rpm-macros-branding
+BuildRequires: coreutils
+
+%description
+Дистрибутивные пакеты оформления и текстов (набор %Theme)
+
+%package bootloader
+Group: System/Configuration/Boot and Init
+Summary: Оформление загрузчика grub2 (%Theme)
+Provides: design-bootloader-%theme
+%branding_add_conflicts %flavour bootloader
+
+%description bootloader
+Тема оформления загрузчика grub2 для набора %Theme
+
+%package bootsplash
+Group: System/Configuration/Boot and Init
+Summary: Заставка загрузки plymouth (%Theme)
+BuildArch: noarch
+Provides: plymouth-theme-%theme
+Requires: plymouth-plugin-script
+%branding_add_conflicts %flavour bootsplash
+
+%description bootsplash
+Тема заставки во время загрузки (plymouth) для набора %Theme
+
+%package alterator
+Group: System/Configuration/Other
+Summary: Оформление alterator (%Theme)
+BuildArch: noarch
+Provides: design-alterator-%theme alterator-icons-%theme
+%branding_add_conflicts %flavour alterator
+
+%description alterator
+Оформление альтератора (web/рабочего стола) для набора %Theme
+
+%package graphics
+Group: Graphics
+Summary: Графика и обои (%Theme)
+BuildArch: noarch
+Provides: design-graphics = 12.0.0 design-graphics-%theme
+Obsoletes: design-graphics-%theme
+%branding_add_conflicts %flavour graphics
+
+%description graphics
+Изображения, обои и элементы оформления рабочего стола для набора %Theme
+
+%package release
+Group: System/Configuration/Other
+Summary: Идентификация выпуска (%Theme)
+BuildArch: noarch
+Requires: alt-os-release
+Provides: altlinux-release-%theme branding-alt-%theme-release
+%branding_add_conflicts %flavour release
+
+%description release
+Файл /etc/altlinux-release и компоненты идентификации выпуска %Theme
+
+%package notes
+Group: Documentation
+Summary: Лицензия и заметки о выпуске (%Theme)
+BuildArch: noarch
+Provides: alt-notes-%theme alt-license-theme
+%branding_add_conflicts %flavour notes
+
+%description notes
+Тексты лицензии и заметок о выпуске набора %Theme
+
+%package indexhtml
+Group: System/Base
+Summary: Страница приветствия index.html (%Theme)
+BuildArch: noarch
+Provides: indexhtml indexhtml-%theme
+%branding_add_conflicts %flavour indexhtml
+
+%description indexhtml
+Главная страница приветствия, показываемая после установки
+
+%package slideshow
+Group: System/Configuration/Other
+Summary: Слайды инсталлятора (%Theme)
+BuildArch: noarch
+%branding_add_conflicts %flavour slideshow
+
+%description slideshow
+Слайды, показываемые во время установки (alterator-install)
+
+%prep
+%setup -n branding
+
+%build
+%nil
+
+%install
+%{__rm} -rf %buildroot
+install -d %buildroot%_datadir %buildroot%_sysconfdir %buildroot%_prefix/lib
+
+# --- bootloader ---
+install -d %buildroot%_datadir/design
+if [ -d bootloader ]; then cp -a bootloader %buildroot%_datadir/design/%theme-bootloader; fi
+
+# --- bootsplash ---
+install -d %buildroot%_datadir/plymouth/themes
+if [ -d bootsplash/plymouth ]; then cp -a bootsplash/plymouth %buildroot%_datadir/plymouth/themes/%theme; fi
+install -d %buildroot%_datadir/bootsplash/libraries
+if [ -d bootsplash/bootsplash ]; then cp -a bootsplash/bootsplash %buildroot%_datadir/bootsplash/libraries/%theme; fi
+
+# --- alterator ---
+install -d %buildroot%_datadir/alterator
+if [ -d alterator ]; then cp -a alterator/. %buildroot%_datadir/alterator/; fi
+
+# --- graphics + alternatives ---
+install -d %buildroot%_datadir/design/%theme
+if [ -d graphics ]; then cp -a graphics/. %buildroot%_datadir/design/%theme/; fi
+install -d %buildroot/etc/alternatives/packages.d
+cat > %buildroot/etc/alternatives/packages.d/%name-graphics <<__EOF__
+%_datadir/artworks	%_datadir/design/%theme 9
+%_datadir/design-current	%_datadir/design/%theme	9
+%_datadir/design/current	%_datadir/design/%theme	9
+__EOF__
+
+# --- release ---
+install -d %buildroot%_sysconfdir/buildreqs/packages/ignore.d
+: > %buildroot%_sysconfdir/buildreqs/packages/ignore.d/%name-release
+printf '%s %s (%s)\n' "%Theme" "%distribution" "%version" > %buildroot%_sysconfdir/altlinux-release
+ln -sf altlinux-release %buildroot%_sysconfdir/linux-release
+if [ -f release/os-release ]; then install -pD -m644 release/os-release %buildroot%_prefix/lib/os-release; fi
+
+# --- notes ---
+if [ -d notes ]; then install -d %buildroot%_datadir/alt-notes/%name; cp -a notes/. %buildroot%_datadir/alt-notes/%name/; fi
+
+# --- indexhtml ---
+if [ -d indexhtml ]; then install -d %buildroot%_datadir/indexhtml; cp -a indexhtml/. %buildroot%_datadir/indexhtml/ 2>/dev/null || :; fi
+
+# --- slideshow ---
+if [ -d slideshow ]; then install -d %buildroot%_datadir/alterator/slideshow/%name; cp -a slideshow/. %buildroot%_datadir/alterator/slideshow/%name/; fi
+
+%files bootloader
+%_datadir/design/%theme-bootloader
+
+%files bootsplash
+%_datadir/plymouth/themes/%theme
+%_datadir/bootsplash/libraries/%theme
+
+%files alterator
+%_datadir/alterator
+
+%files graphics
+%_datadir/design/%theme
+%_datadir/artworks
+%_datadir/design-current
+%_datadir/design/current
+%_sysconfdir/alternatives/packages.d/%name-graphics
+
+%files release
+%_sysconfdir/altlinux-release
+%_sysconfdir/linux-release
+%_sysconfdir/buildreqs/packages/ignore.d/%name-release
+%_prefix/lib/os-release
+
+%files notes
+%_datadir/alt-notes/%name
+
+%files indexhtml
+%_datadir/indexhtml
+
+%files slideshow
+%_datadir/alterator/slideshow/%name

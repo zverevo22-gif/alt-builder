@@ -1,0 +1,23 @@
+# Пользовательский список пакетов: попадает и в Live-сессию, и в
+# устанавливаемую систему (подключён через THE_LISTS_EXTRA в config/packages.conf).
+# По одному имени пакета на строку; пустые строки и строки с '#' игнорируются.
+# Имена брать из репозитория ветки BRANCH (apt-cache search ...). Альтернативные
+# имена при их отсутствии в ветке допускаются: сборка просто не найдёт пакет
+# (управление - NOCHECK, см. README).
+#
+# примеры (раскомментируйте нужное):
+# firefox
+# thunderbird
+# inkscape
+  gimp
+  libreoffice
+# gnome-recipes
+  eepm
+  yandex-browser
+  appinstall
+  portprotonqt
+  gnote
+  gnome-shell-extension-dash-to-dock
+  gnome-shell-extension-blur-my-shell
+  alt-panelmoded
+  pdfarranger

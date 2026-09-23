@@ -1,0 +1,27 @@
+#!/bin/sh -efu
+# ============================================================================
+#  Хук брендирования (image-script). Выполняется внутри соответствующего
+#  chroot'а на этапе сборки образа; пишет идентификационный файл кастомного
+#  бренда в /etc/custom-brand и переносит читаемое имя (RELNAME) в
+#  /usr/lib/os-release (видно в live-сессии и в меню загрузчика).
+#
+#  Сгенерировано scripts/gen-profile.sh из шаблона
+#  profile/features.in/custom-brand/99-custom-brand.sh.in.
+# ============================================================================
+
+f=/etc/custom-brand
+rm -f -- "$f"
+{
+    printf 'brand=%s\n'   '@BRANDING@'
+    printf 'relname=%s\n' '@RELNAME@'
+    printf 'vendor=%s\n'  '@VENDOR_NAME@'
+    printf 'built=%s\n'   '@BUILD_DATE@'
+} > "$f"
+
+osrel=/usr/lib/os-release
+[ -f "$osrel" ] || osrel=/etc/os-release
+if [ -f "$osrel" ]; then
+    sed -i \
+        -e 's#^NAME=.*$#NAME="@RELNAME@"#' \
+        -e 's#^PRETTY_NAME=.*$#PRETTY_NAME="@RELNAME@"#' "$osrel"
+fi
