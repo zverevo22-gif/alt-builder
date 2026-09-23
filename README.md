@@ -1,4 +1,4 @@
-**ALT Linux  — сборка собственного ISO-образа**  
+**ALT Linux — сборка собственного ISO-образа**  
 Набор скриптов для **сборки установочного ISO-образа ALT Linux GNOME**  
    
  с возможностью **изменения состава пакетов** и  **брендирования**  
@@ -55,15 +55,16 @@ alt-gnome/
  │   ├── features.in/custom-brand/        # фича собственного брендинга  
  │   ├── pkg.in/lists/custom/             # ваши списки пакетов  
  │   └── branding/files/                  # BRANDING_MODE=files: дерево / инсталлятора  
- ├── branding-template/           # источники собственного брендинга (repo-режим)  
+ ├── branding-template/           # источники собственного брендинга (BRANDING_MODE=repo;  
+ │                               #   если здесь есть содержимое, но режим НЕ repo — оно в образ не попадёт)  
  ├── tools/  
- │   ├── make-aptconf.sh          # генерация APTCONF для hasher  
- │   └── mk-branding.sh           # сборка branding-<имя>-* и локального репозитория  
+ │   ├── make-aptconf.sh          # генерация APTCONF для hasher (+ доп. локальный источник)  
+ │   └── mk-branding.sh           # сборка branding-<имя>-* и локального apt-репозитория  
  ├── work/                        # рабочее состояние (создаётся при сборке)  
  └── out/                         # готовые ISO (создаётся при сборке)  
    
 work/ и out/ пересоздаются автоматически и перечислены в .gitignore.  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANElEQVR4nO3OUQmAABBAsSeILQSjXgcrmkOs4J8IW4ItM7NXZwAA/MW1Vlt1fBwBAOC9+wEukwQ+V/SggAAAAABJRU5ErkJggg==)  
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OMQ2AABAAsSNhYMEBIpD4ArCJDyywEZJWQZeZOaorAAD+4l6rrTq/ngAA8Nr+AEqmA1hl45m5AAAAAElFTkSuQmCC)  
 **3. Как это устроено (кратко)**  
 Сборку делает официальный mkimage-profiles. Набор добавляет к нему  
    
@@ -74,6 +75,9 @@ work/ и out/ пересоздаются автоматически и пере�
      @$(call add,THE_LISTS,...)  
      ...  
    
+(на примере GNOME; тем же шаблоном по одному за запуск формируются  
+   
+ alt-cinnamon из regular-cinnamon и alt-plasma из regular-kde.)  
 - **distro/regular-<де>** — полный состав штатной редакции ALT выбранного  
    
  окружения: GNOME (regular-gnome), Cinnamon (regular-cinnamon) или KDE  
@@ -94,8 +98,12 @@ work/ и out/ пересоздаются автоматически и пере�
  позволяет переопределять параметры на лету.  
 Жизненный цикл сборки (build.sh):  
 --setup        → env-setup-alt|debian      (только подготовка среды)  
+ выбор DE       → диалог (если запуск с терминала; пропускается при -d/--desktop,  
+                 ALT_GNOME_DESKTOP, --setup, --no-build, --selfcheck)  
  проверка изм.  → отпечаток config/ + profile/ + scripts/ (work/.profile-…)  
                 → если конфигурация НЕ менялась — профиль не пересобирается  
+ брендинг(repo) → при изменении branding-template/ пересобрать branding-<имя>-*  
+                  и обновить локальный репозиторий (BRANDING_LOCAL_REPO)  
  gen-profile.sh → 1. клонировать/обновить mkimage-profiles (work/)  
                 → 2. наложить profile/ (merge, без удаления штатных файлов)  
                 → 3. сгенерировать conf.d/999-alt-desktop.mk (по DESKTOP)  
@@ -116,7 +124,13 @@ work/ и out/ пересоздаются автоматически и пере�
    
  пересоберётся автоматически; ничего не меняли — он будет переиспользован  
    
- (быстрее и без «лишних» регенераций APTCONF).  
+ (быстрее и без «лишних» регенераций APTCONF). В отпечаток входят и  
+   
+ действующие значения (DESKTOP, TARGET, BRANCH, ARCH) после применения  
+   
+ переопределений из окружения — поэтому смена DE ключом -d/переменной  
+   
+ ALT_GNOME_DESKTOP тоже пересобирает профиль, даже когда файлы не тронуты.  
 **Автоочистка истории сборки.** После успешной сборки build.sh удаляет  
    
  большое временное BUILD-дерево mkimage (work/mkimage-profiles.build,  
@@ -128,15 +142,20 @@ work/ и out/ пересоздаются автоматически и пере�
  AUTOCLEAN в config/build.conf (по умолчанию 1); при DEBUG=1  
    
  автоочистка отключается.  
-**Выбор графического окружения перед сборкой.** build.sh спрашивает DE  
+**Выбор графического окружения перед сборкой.** Если DE не задан явно, а  
    
- интерактивно (если запуск идёт с терминала):  
+ запуск идёт с терминала (и это не --setup/--no-build/--selfcheck),  
+   
+ build.sh спрашивает (в т.ч. при --check — проверка тоже собирает  
+   
+ профиль):  
 $ scripts/build.sh  
- [Ток] выберите графическое окружение (Enter = gnome):  
+ [BUILD] выберите графическое окружение (Enter = gnome):  
   1) gnome  
   2) cinnamon  
   3) plasma  
  > 2  
+ [  OK  ] выбрано окружение: cinnamon  
    
 Можно и без вопроса — ключом -d/--desktop либо переменной окружения  
    
@@ -144,7 +163,9 @@ $ scripts/build.sh
    
  значение в config/build.conf (DESKTOP=). Выбор действует на один запуск  
    
- (в конфигурацию не записывается).  
+ (в конфигурацию не записывается) и автоматически формирует цель  
+   
+ distro/alt-<де>.iso.  
 scripts/build.sh -d plasma  
  ALT_GNOME_DESKTOP=cinnamon scripts/build.sh  
    
@@ -155,7 +176,7 @@ scripts/build.sh -d plasma
  профиля через переменные ALT_GNOME_* и перекрывают соответствующие  
    
  значения из config/*.conf без их изменения на диске.  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OMQ2AABAAsSNhYMEBIpD4ArCJDyywEZJWQZeZOaorAAD+4l6rrTq/ngAA8Nr+AEqmA1hl45m5AAAAAElFTkSuQmCC)  
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OMQ2AABAAsSNBCkLfFR7wwIgHRiywEZJWQZeZ2ao9AAD+4lyruzq+ngAA8Nr1AOIEBeX8aGZPAAAAAElFTkSuQmCC)  
 **4. Быстрый старт**  
 **4.1. На ALT Linux**  
 # 1. подготовка среды (от root; либо sudo):  
@@ -173,7 +194,7 @@ scripts/build.sh -d plasma
    
  # 2. перелогиньтесь (применение группы hasher), затем от обычного пользователя:  
  scripts/build.sh --check      # быстрая проверка конфигурации  
- scripts/build.sh              # полная сборка ISO  
+ scripts/build.sh              # полная сборка ISO (спросит окружение, либо -d gnome|cinnamon|plasma)  
    
 **ВАЖНО про root:** mkimage+hasher рассчитаны на обычного (не root)  
    
@@ -184,7 +205,9 @@ scripts/build.sh -d plasma
  и она упала — выполните подготовку и проверьте /etc/hasher-priv/system:  
 Результат — out/alt-<де>-*.iso (alt-gnome-*, alt-cinnamon-*, alt-plasma-*;  
    
- <де> — выбранное окружение, см. config/build.conf, DESKTOP). Журнал сборки  
+ <де> — выбранное окружение: из config/build.conf (DESKTOP=) либо заданное  
+   
+ на запуск ключом -d/переменной ALT_GNOME_DESKTOP). Журнал сборки  
    
  копируется в out/build-*.log.  
 **4.2. На Debian/Ubuntu**  
@@ -196,12 +219,18 @@ scripts/build.sh -d plasma
  scripts/build.sh  
    
 Подробности и ручные шаги — см. раздел 6.  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OMQ2AABAAsSNhYMMAKlD4OzrxgQU2QtIq6DIzR3UFAMBf3Gu1VefXEwAAXtsfSqADWz4G/HUAAAAASUVORK5CYII=)  
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OMQ2AABAAsSPBCUbfEm6YmFDBhAU2QtIq6DIzW7UHAMBfnGt1V8fXEwAAXrse/w8F7pbTa1oAAAAASUVORK5CYII=)  
 **5. Настройка состава ПО**  
 **Выбор графического окружения (DESKTOP)**  
-Окружение задаётся в config/build.conf:  
+Окружение задаётся **либо** в config/build.conf,  **либо** на один запуск  
+   
+ через -d/--desktop/переменную ALT_GNOME_DESKTOP/диалог build.sh  
+   
+ (см. §3):  
 # gnome (по умолчанию) | cinnamon | plasma  
  DESKTOP="gnome"  
+   
+scripts/build.sh -d cinnamon      # собрать именно Cinnamon, не меняя конфиг  
    
 | | | | |  
 |-|-|-|-|  
@@ -293,7 +322,7 @@ scripts/build.sh --check   # быстрая проверка согласов�
 | гарантированно в базе | BASE_PACKAGES_EXTRA |   
 | исключить из образа | BLACKLIST_PKGS |   
    
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OMQ2AABAAsSNBCUrfDqrYGVDAgAU2QtIq6DIzW7UHAMBfHGt1V+fXEwAAXrseHCQGBEuErVgAAAAASUVORK5CYII=)  
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OQQmAABRAsSfYxZo/jkUsYQLPJrCCNxG2BFtmZquOAAD4i3Ot7mr/egIAwGvXA4rDBc72meO5AAAAAElFTkSuQmCC)  
 **6. Подробнее о средах сборки**  
 **6.1. ALT Linux**  
 sudo scripts/env-setup-alt.sh $USER  
@@ -344,7 +373,7 @@ scripts/build.sh --setup
 *Образ ALT внутри контейнера — обычный ALT Linux, поэтому сборка Go-кода*  
  *  
  или низкоуровневые проверки работают как на «железе».*  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OMQ2AABAAsSNhQAQ60PcrIhnxgQU2QtIq6DIze3UGAMBf3Gu1VcfXEwAAXrseS14EKxPCORkAAAAASUVORK5CYII=)  
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANElEQVR4nO3OMQ0AIAwAwZIgBKn1gjJsdGLBABMhuZt+/JaZIyJmAADwi9VP1NMNAABu1AaU4gUeBSGW2wAAAABJRU5ErkJggg==)  
 **7. Брендирование**  
 Поведение задаётся в config/branding.conf (BRANDING_MODE).  
 **7.1. **auto ** — штатные брендинги ALT (по умолчанию)**  
@@ -358,7 +387,20 @@ Mkimage-profiles закрепляет в установленной систем
  субпакетов должны существовать в репозитории выбранной ветки. Для p10/p9  
    
  готовым решением является alt-starterkit, для Сизифа — alt-sisyphus.  
-**7.2. **repo ** — собственные брендинг-пакеты**  
+**7.2. **repo ** — собственные брендинг-пакеты (графика рабочего стола и пр.)**  
+Если в branding-template/ лежит содержимое (в т.ч. **графика рабочего**  
+ **  
+ стола** — обои в graphics/ и т.д.), а BRANDING_MODE НЕ repo, это  
+   
+ содержимое в образ **не попадёт**: сборка выведет предупреждение и продолжит  
+   
+ со штатным брендингом. Чтобы свои обои/логотипы попали в образ, включите  
+   
+ repo:  
+# config/branding.conf  
+ BRANDING_MODE="repo"  
+ BRANDING="mydistro"                # имя вашего бренда (без префикса branding-)  
+   
 tools/mk-branding.sh --theme=mydistro --name="My Distro" --codename=veles  
    
 mk-branding.sh:  
@@ -371,31 +413,47 @@ mk-branding.sh:
    
  если файл есть, в нём подставляются макросы %%NAME%% и т.д.;  
 4. собирает src.rpm и бинарные пакеты branding-mydistro-{...};  
-5. создаёт локальный apt-репозиторий work/apt.d/localrepo (индекс genbasedir).  
-После этого в конфигурации:  
-# branding.conf  
- BRANDING_MODE=repo  
- BRANDING=mydistro  
- # build.conf  
- APT_MIRROR="file:///путь/до/alt-gnome/work/apt.d/localrepo"  
+5. создаёт локальный apt-репозиторий BRANDING_LOCAL_REPO  
    
-и перезапустить scripts/build.sh.  
-Формат строки репозитория — rpm [<vendor>] <корень-зеркала> <путь>/<arch> <компонент>  
+ (по умолчанию work/apt.d/localrepo; индекс genbasedir).  
+**Подключение локального репозитория.** Оно выполняется  **автоматически**:  
    
- (канонически: rpm [p11] http://mirror.yandex.ru/altlinux p11/branch/x86_64 classic);  
+ при BRANDING_MODE=repo gen-profile.sh выставляет  
    
- <vendor> здесь — имя ветки, которой зеркало подписывается ключом (см.  
+ APT_EXTRA_MIRROR=file://<BRANDING_LOCAL_REPO>, и make-aptconf.sh дописывает  
    
- vendors.list.d в work/apt.d/<ветка>-<арх>/). Для локального репозитория из  
+ в sources.list ещё одну строку **дополнительно к сетевому зеркалу ветки**  
    
- mk-branding.sh (плоская структура genbasedir: <каталог>/<арх>/base) это,  
+ (не вместо него):  
+rpm [p11] http://mirror.yandex.ru/altlinux p11/branch/x86_64 classic  
+ rpm [local] file:///…/work/apt.d/localrepo x86_64 base  
    
- например: rpm [p11] file:///путь/до/work/apt.d/localrepo x86_64 base.  
+Вендор local объявлен **без fingerprint** (vendors.list.d/local.list),  
+   
+ поэтому подпись локального репозитория не проверяется. Никаких правок  
+   
+ APT_MIRROR/config/build.conf для этого не требуется.  
+**Авто-пересборка.** Пакеты брендинга пересобираются автоматически, когда  
+   
+ изменяется содержимое branding-template/ (сравнение по отпечатку  
+   
+ work/.branding-fingerprint.sha) — не при каждом запуске. Если отпечаток не  
+   
+ менялся, а локальный репозиторий уже существует, сборка брендинга  
+   
+ пропускается.  
 Наполнение каталогов branding-template/{graphics,bootloader,bootsplash, indexhtml,notes,slideshow,alterator}/ описано в  
    
  branding-template/README.md. Образцы реализации: официальный  
    
  branding-alt-starterkit.  
+*Формат строки репозитория: * *rpm [<vendor>] <корень-зеркала> <путь>/<arch> <компонент>* *.*  
+ *  
+ Сетевое зеркало ветки подключается с вендором = имя ветки (проверка подписи*  
+ *  
+ штатна); локальный источник * *mk-branding.sh* * — с вендором * *local* * (без*  
+ *  
+ fingerprint). См. также * *tools/make-aptconf.sh* *.*  
 **7.3. **files ** — копирование дерева файлов**  
 BRANDING_MODE=files  
    
@@ -438,7 +496,7 @@ profile/branding/files/etc/os-release            → /etc/os-release
  формирует брендинг-пакет (см. 7.2, у mk-branding.sh для этого есть  
    
  --name=; генерируется /usr/lib/os-release в branding-*-release).  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OQQmAABRAsSeYxZw/lieLGMACBrCCNxG2BFtmZquOAAD4i3Ot7mr/egIAwGvXA6fGBdgoVMwYAAAAAElFTkSuQmCC)  
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OMQ2AUBBAsUfyNTCi9VwgEA3sWGAjJK2CbjNzVGcAAPzFtapV7V9PAAB47X4AEW4ELQDBN+AAAAAASUVORK5CYII=)  
 **8. Проверка образа**  
 scripts/check-iso.sh out/alt-*.iso  
  scripts/check-iso.sh --latest  
@@ -578,6 +636,33 @@ rm -rf work-test work/debian
  контейнер с --privileged --userns=host --security-opt seccomp=unconfined  
    
  (обёртка work/debian/run-in-container.sh уже делает это).  
+- **make: Нет правила для сборки цели distro/alt-….iso** — в work/ лежит  
+   
+ профиль от ДРУГОГО окружения/цели, make не знает new-цель. Это штатно  
+   
+ при смене DE, когда профиль ещё не пересобран. build.sh сам регенерирует  
+   
+ профиль по отпечатку — при изменении DESKTOP/TARGET (в т.ч. ключом -d,  
+   
+ переменной ALT_GNOME_DESKTOP или диалогом) отпечаток меняется и профиль  
+   
+ переформируется перед сборкой. Если такое падение всё же произошло —  
+   
+ запустите scripts/build.sh ещё раз (или scripts/gen-profile.sh).  
+- **Образ уходит не в ** **out/** ** проекта, а «куда-то не туда»** — команда  
+   
+ запущена из каталога, который является **симлинком** (в т.ч. внутри корзины,  
+   
+ например ~/.local/share/Trash/files/…). Скрипты вычисляют путь проекта  
+   
+ физически (realpath), поэтому out/ создаётся по месту реального файла  
+ scripts/, а не по имени каталога в приглашении. Исправление: работайте в  
+   
+ реальной директории (или перенесите проект из корзины обратно).  
+- **Диалог выбора окружения** — принимает и номер, и имя:  
+ 1/gnome, 2/cinnamon, 3/plasma/kde, пустой ввод — значение из  
+   
+ конфига (DESKTOP=).  
 - **Не знаете, что за профиль получится** — scripts/selfcheck.sh сравнивает  
    
  overlay со свежим mkimage-profiles, а --check прогоняет согласование  
